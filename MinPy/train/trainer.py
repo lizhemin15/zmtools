@@ -85,11 +85,11 @@ class trainer(object):
                     pre = pre.cpu()
                 else:
                     pre = net(x)
-                
+                pic = pre.cpu().detach().reshape(height,width)
+                pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
+                pic = pic.numpy()
                 if self.plot_if:
-                    pic = pre.cpu().detach().reshape(height,width)
-                    pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
-                    pic = pic.numpy()
+
                     self.plot_fig(pic)
                     
                 if self.print_if:
@@ -125,11 +125,10 @@ class trainer(object):
                         e2e = get_e2e(model)
                         loss = e2e_loss(e2e,real_pic)
                     loss_cpu = loss.detach().cpu()
-
+                    pic = e2e.cpu().detach().reshape(height,width)
+                    pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
+                    pic = pic.numpy()
                     if plot_if:
-                        pic = e2e.cpu().detach().reshape(height,width)
-                        pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
-                        pic = pic.numpy()
                         self.plot_fig(pic)
                     if save_fig_if:
                         self.save_fig(pic,i)
@@ -219,11 +218,11 @@ class trainer(object):
                     pre = net(pic_vec)
                 if self.print_if:
                     print('Epoch ',i,' loss = ',loss_cpu)
-                
+                show_pic = pre.cpu().detach().reshape(pic.shape[0],pic.shape[1])
+                show_pic = data_loader.data_transform(z=show_pic).shuffle(M=show_pic,shuffle_list=shuffle_list,mode='to')
+                show_pic = show_pic.numpy()
                 if self.plot_if:
-                    show_pic = pre.cpu().detach().reshape(pic.shape[0],pic.shape[1])
-                    show_pic = data_loader.data_transform(z=show_pic).shuffle(M=show_pic,shuffle_list=shuffle_list,mode='to')
-                    show_pic = show_pic.numpy()
+
                     self.plot_fig(show_pic)
                 if self.save_fig_if:
                     self.save_fig(show_pic,i)
@@ -260,11 +259,11 @@ class trainer(object):
                     pre = net(pic_vec)
                 if self.print_if:
                     print('Epoch ',i,' loss = ',loss_cpu)
-                
+                show_pic = pre.cpu().detach().reshape(pic.shape[0],pic.shape[1])
+                show_pic = data_loader.data_transform(z=show_pic).shuffle(M=show_pic,shuffle_list=shuffle_list,mode='to')
+                show_pic = show_pic.numpy()
                 if self.plot_if:
-                    show_pic = pre.cpu().detach().reshape(pic.shape[0],pic.shape[1])
-                    show_pic = data_loader.data_transform(z=show_pic).shuffle(M=show_pic,shuffle_list=shuffle_list,mode='to')
-                    show_pic = show_pic.numpy()
+
                     self.plot_fig(show_pic)
                 if self.save_fig_if:
                     self.save_fig(show_pic,i)
