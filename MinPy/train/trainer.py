@@ -132,6 +132,8 @@ class trainer(object):
                         self.plot_fig(pic)
                     if save_fig_if:
                         self.save_fig(pic,i)
+                    if self.print_if:
+                        print('Epoch ',i,' loss = ',loss_cpu)
                     loss_list.append((i,loss_cpu))
                 train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
             if save_list_if == True:
