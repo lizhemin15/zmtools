@@ -10,6 +10,10 @@ import MinPy.train.data_loader as data_loader
 import matplotlib.pyplot as plt
 import MinPy.net.pcnn as pcnn
 import MinPy.train.trainer as trainer
+import torch as t
+
+
+mask_in = t.randint(0,2,(1,1,100,100)).float()
 
 pcnn_net = pcnn.net()
 
@@ -34,14 +38,15 @@ trainer = trainer.trainer(save_dir='./results/',
                           plot_if=True,
                           save_fig_if=False,
                           save_list_if=False,
-                          epoch=101,
+                          epoch=1001,
                           cuda_if=False,
                           gpu_id=0)
 
 
-trainer.train_cnn(net=pcnn_net,
+trainer.train_pcnn(net=pcnn_net,
                   pic=shuffle_pic,
-                  shuffle_list=shuffle_list)
+                  shuffle_list=shuffle_list,
+                  mask_in = mask_in)
 
 
 

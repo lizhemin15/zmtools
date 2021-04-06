@@ -272,6 +272,48 @@ class trainer(object):
                 loss_list.append((i,loss_cpu))
         if self.save_list_if == True:
             self.save_list(loss_list)
+        
+        
+    def train_pcnn(self,net=None,pic=None,shuffle_list=None,mask_in=None):
+        if self.cuda_if:
+            net = net.cuda(self.gpu_id)
+        optimizer = t.optim.Adam(net.parameters())
+        loss_list = []
+        pic_vec = pic.reshape((1,1,pic.shape[0],pic.shape[1]))
+        #print(pic_vec.shape)
+        for i in range(self.epoch):
+            if self.cuda_if:
+                prediction = net(pic_vec.cuda(self.gpu_id),mask_in)
+            else:
+                prediction = net(pic_vec,mask_in)
+            if self.cuda_if:
+                loss = self.loss_func(prediction, pic_vec.cuda(self.gpu_id))     # must be (1. nn output, 2. target)
+            else:
+                loss = self.loss_func(prediction, pic_vec) 
+            optimizer.zero_grad()   # clear gradients for next train
+            loss.backward()         # backpropagation, compute gradients
+            optimizer.step()        # apply gradients
+            if i%10 == 0:
+                loss_cpu = loss.cpu().detach().numpy()
+            if i%100==0:
+                if self.cuda_if:
+                    pre = net(pic_vec.cuda(self.gpu_id),mask_in).cuda(self.gpu_id)
+                    pre = pre.cpu()
+                else:
+                    pre = net(pic_vec,mask_in)
+                if self.print_if:
+                    print('Epoch ',i,' loss = ',loss_cpu)
+                show_pic = pre.cpu().detach().reshape(pic.shape[0],pic.shape[1])
+                show_pic = data_loader.data_transform(z=show_pic).shuffle(M=show_pic,shuffle_list=shuffle_list,mode='to')
+                show_pic = show_pic.numpy()
+                if self.plot_if:
+
+                    self.plot_fig(show_pic)
+                if self.save_fig_if:
+                    self.save_fig(show_pic,i)
+                loss_list.append((i,loss_cpu))
+        if self.save_list_if == True:
+            self.save_list(loss_list)
     
 
 
