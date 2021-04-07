@@ -12,11 +12,13 @@ import os
 import matplotlib.pyplot as plt
 import pickle
 from . import data_loader
+from ..reg import reg
+
 
 class trainer(object):
     def __init__(self,cuda_if=False,gpu_id=0,print_if=False,
                  save_fig_if=False,save_list_if=False,epoch=5001,plot_if=False,
-                 save_dir=None):
+                 save_dir=None,reg_name=None,loss_name='mse'):
         self.cuda_if = cuda_if
         self.gpu_id = gpu_id
         self.print_if = print_if
@@ -25,12 +27,22 @@ class trainer(object):
         self.plot_if = plot_if
         self.epoch = epoch
         self.save_dir = save_dir
+        self.reg_name = reg_name
+        
         if save_fig_if or save_list_if:
             self.create_dir_not_exist(self.save_dir)
-        if cuda_if:
-            self.loss_func = t.nn.MSELoss().cuda(gpu_id)  # this is for regression mean squared loss
+        if loss_name == 'mse':
+            if cuda_if:
+                self.loss_func = t.nn.MSELoss().cuda(gpu_id)  # this is for regression mean squared loss
+            else:
+                self.loss_func = t.nn.MSELoss()
+        elif loss_name == 'l1':
+            if self.cuda_if:
+                self.loss_func = t.nn.L1Loss().cuda(self.gpu_id)  # this is for regression mean squared loss
+            else:
+                self.loss_func = t.nn.L1Loss()
         else:
-            self.loss_func = t.nn.MSELoss()
+            raise('Wrong loss name, please input: \n 1.mse 2.l2')
             
     def create_dir_not_exist(self,path):
         if not os.path.exists(path):
@@ -115,15 +127,20 @@ class trainer(object):
                 model = model.cuda(self.gpu_id)
             optimizer = t.optim.Adam(model.parameters())
             for i in range(epoch):
-                if i%500==0:
+                train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
+                if cuda_if:
+                    e2e = get_e2e(model).cuda(gpu_id)
+                    loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
+                else:
+                    e2e = get_e2e(model)
+                    loss = e2e_loss(e2e,real_pic)
+                if self.reg_name:
+                    reg_obj = reg.reg(e2e,self.reg_name)    # add regularization term
+                    loss += reg_obj.loss()   # regularization term
+                if i%500==1:
                     #print('epoch ',i+1)
-                    train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
-                    if cuda_if:
-                        e2e = get_e2e(model).cuda(gpu_id)
-                        loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
-                    else:
-                        e2e = get_e2e(model)
-                        loss = e2e_loss(e2e,real_pic)
+                    #train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
+                    
                     loss_cpu = loss.detach().cpu()
                     pic = e2e.cpu().detach().reshape(height,width)
                     pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
@@ -135,7 +152,7 @@ class trainer(object):
                     if self.print_if:
                         print('Epoch ',i,' loss = ',loss_cpu)
                     loss_list.append((i,loss_cpu))
-                train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
+                
             if save_list_if == True:
                 self.save_list(loss_list)
         
@@ -206,7 +223,10 @@ class trainer(object):
             if self.cuda_if:
                 loss = self.loss_func(prediction, pic_vec.cuda(self.gpu_id))     # must be (1. nn output, 2. target)
             else:
-                loss = self.loss_func(prediction, pic_vec) 
+                loss = self.loss_func(prediction, pic_vec)
+            if self.reg_name:
+                reg_obj = reg.reg(prediction.reshape(pic.shape),self.reg_name)    # add regularization term
+                loss += reg_obj.loss()   # regularization term
             optimizer.zero_grad()   # clear gradients for next train
             loss.backward()         # backpropagation, compute gradients
             optimizer.step()        # apply gradients
@@ -244,10 +264,14 @@ class trainer(object):
                 prediction = net(pic_vec.cuda(self.gpu_id))
             else:
                 prediction = net(pic_vec)
+            
             if self.cuda_if:
                 loss = self.loss_func(prediction, pic_vec.cuda(self.gpu_id))     # must be (1. nn output, 2. target)
             else:
-                loss = self.loss_func(prediction, pic_vec) 
+                loss = self.loss_func(prediction, pic_vec)
+            if self.reg_name:
+                reg_obj = reg.reg(prediction,self.reg_name)    # add regularization term
+                loss += reg_obj.loss()   # regularization term
             optimizer.zero_grad()   # clear gradients for next train
             loss.backward()         # backpropagation, compute gradients
             optimizer.step()        # apply gradients
@@ -287,9 +311,12 @@ class trainer(object):
             else:
                 prediction = net(pic_vec,mask_in)
             if self.cuda_if:
-                loss = self.loss_func(prediction, pic_vec.cuda(self.gpu_id))     # must be (1. nn output, 2. target)
+                loss = self.loss_func(mask_in*prediction, mask_in*pic_vec.cuda(self.gpu_id))     # must be (1. nn output, 2. target)
             else:
-                loss = self.loss_func(prediction, pic_vec) 
+                loss = self.loss_func(mask_in*prediction, mask_in*pic_vec)
+            if self.reg_name:
+                reg_obj = reg.reg(prediction,self.reg_name)    # add regularization term
+                loss += reg_obj.loss()   # regularization term
             optimizer.zero_grad()   # clear gradients for next train
             loss.backward()         # backpropagation, compute gradients
             optimizer.step()        # apply gradients
