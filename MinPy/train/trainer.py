@@ -148,8 +148,8 @@ class trainer(object):
                         loss = e2e_loss(e2e,real_pic)
                 if self.reg_name:
                     reg_obj = reg.reg(e2e,self.reg_name)    # add regularization term
-                    loss += reg_obj.loss()   # regularization term
-                if i%500==1:
+                    loss += reg_obj.loss()/255   # regularization term
+                if i%500==0:
                     #print('epoch ',i+1)
                     #train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
                     
