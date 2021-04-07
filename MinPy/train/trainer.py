@@ -342,8 +342,7 @@ class trainer(object):
         if self.save_list_if == True:
             self.save_list(loss_list)
     
-
-
+    
 
 
 

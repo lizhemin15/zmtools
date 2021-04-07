@@ -4,6 +4,13 @@ Created on Sat Nov 28 15:43:05 2020
 
 @author: jamily
 """
+
+import os
+import sys
+current_dir = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(current_dir)
+sys.path.append("..")
+
 import torch
 import torch.nn as nn
 
