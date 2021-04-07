@@ -115,21 +115,26 @@ class trainer(object):
             self.save_list(loss_list)
 
     def train_dmf(self,height=None,width=None,shuffle_list=None,
-                  parameters=[100,100],real_pic=None,mask_in=None):
+                  parameters=[100,100],real_pic=None,mask_in=None,
+                  dropout_if=False,nonlinear='no'):
         def main(cuda_if = self.cuda_if,gpu_id=self.gpu_id,
                  plot_if=self.plot_if,save_fig_if=self.save_fig_if,
                  save_list_if=self.save_list_if,epoch=self.epoch,
                  height=100,width=100,real_pic=None,
                  shuffle_list=None,parameters=[100,100],
-                 print_if=self.print_if,mask_in=None):
+                 print_if=self.print_if,mask_in=None,
+                 dropout_if=False,nonlinear='no'):
             loss_list = []
-            model = build_model(parameters=parameters,m=height,n=width,cuda_if=cuda_if,gpu_id=gpu_id)
+            model = build_model(parameters=parameters,m=height,n=width,
+                                cuda_if=cuda_if,
+                                gpu_id=gpu_id,nonlinear=nonlinear)
             if self.cuda_if:
                 model = model.cuda(self.gpu_id)
+            print(model)
             optimizer = t.optim.Adam(model.parameters())
             for i in range(epoch):
                 train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,
-                      gpu_id=gpu_id,real_pic=real_pic,model=model)
+                      gpu_id=gpu_id,real_pic=real_pic,model=model,mask_in=mask_in)
                 if cuda_if:
                     e2e = get_e2e(model).cuda(gpu_id)
                     loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
@@ -140,7 +145,6 @@ class trainer(object):
                 if i%500==0:
                     #print('epoch ',i+1)
                     #train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
-                    loss = e2e_loss(e2e,real_pic)
                     loss_cpu = loss.detach().cpu()
                     pic = e2e.cpu().detach().reshape(height,width)
                     pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
@@ -150,20 +154,28 @@ class trainer(object):
                     if save_fig_if:
                         self.save_fig(pic,i)
                     if self.print_if:
-                        print('Epoch ',i,' loss = ',loss_cpu)
+                        if cuda_if:
+                            print('Epoch ',i,' loss = ',loss_cpu,'NMAE:',
+                                  t.nn.L1Loss(reduction='sum')((1-mask_in)*e2e,(1-mask_in)*real_pic.cuda(gpu_id))/t.sum(1-mask_in).cuda())
+                        else:
+                            print('Epoch ',i,' loss = ',loss_cpu,'NMAE:',
+                                  t.nn.L1Loss(reduction='sum')((1-mask_in)*e2e,(1-mask_in)*real_pic)/t.sum(1-mask_in))
                     loss_list.append((i,loss_cpu))
                 
             if save_list_if == True:
                 self.save_list(loss_list)
         
-        def build_model(parameters=[100,100],m=100,n=100,cuda_if=False,gpu_id=0):
+        def build_model(parameters=[100,100],m=100,n=100,cuda_if=False,gpu_id=0,
+                        bias_if=False,nonlinear='no'):
             hidden_sizes = [m]
             hidden_sizes.extend(parameters)
             hidden_sizes.extend([n])
             layers = zip(hidden_sizes, hidden_sizes[1:])
             nn_list = []
             for (f_in,f_out) in layers:
-                nn_list.append(nn.Linear(f_in, f_out, bias=False))
+                nn_list.append(nn.Linear(f_in, f_out, bias=bias_if))
+                if dropout_if:
+                    nn_list.append(t.nn.Dropout(p=0.7))
             if cuda_if:
                 model = nn.Sequential(*nn_list).cuda(gpu_id)
             else:
@@ -177,11 +189,11 @@ class trainer(object):
             #获取预测矩阵
             weight = None
             for fc in model.children():
-                assert isinstance(fc, nn.Linear) and fc.bias is None
-                if weight is None:
-                    weight = fc.weight.t()
-                else:
-                    weight = fc(weight)
+                if isinstance(fc, nn.Linear) and fc.bias is None:
+                    if weight is None:
+                        weight = fc.weight.t()
+                    else:
+                        weight = fc(weight)
             t.clamp(weight,0,1)
             return weight
     
@@ -209,7 +221,7 @@ class trainer(object):
                     loss = e2e_loss(e2e,real_pic)
             if self.reg_name:
                     reg_obj = reg.reg(e2e,self.reg_name)    # add regularization term
-                    loss += reg_obj.loss()/255  # regularization term
+                    loss += reg_obj.loss()/(real_pic.shape[0])  # regularization term
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -218,7 +230,8 @@ class trainer(object):
         ####主程序####
         #############
         main(height=height,width=width,shuffle_list=shuffle_list,
-             parameters=parameters,real_pic=real_pic,mask_in=mask_in)
+             parameters=parameters,real_pic=real_pic,mask_in=mask_in,
+             dropout_if=dropout_if,nonlinear=nonlinear)
 
     
     
