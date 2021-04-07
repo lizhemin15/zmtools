@@ -50,12 +50,12 @@ class trainer(object):
     
     def plot_fig(self,pic):
         #传入的图像格式为numpy类型
-        plt.imshow(pic,'gray')
+        plt.imshow(pic,'gray',vmin=0,vmax=1)
         plt.show()
     
     def save_fig(self,pic=None,epochs=0):
         #传入的图像格式为numpy类型
-        plt.imsave(self.save_dir+str(epochs)+'.png',pic,cmap='gray')
+        plt.imsave(self.save_dir+str(epochs)+'.png',pic,cmap='gray',vmin=0,vmax=1)
     
     def save_list(self,loss_list):
         with open(self.save_dir+'loss.txt','wb') as f:
@@ -128,31 +128,19 @@ class trainer(object):
                 model = model.cuda(self.gpu_id)
             optimizer = t.optim.Adam(model.parameters())
             for i in range(epoch):
-                if mask_in != None:
-                    train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,
-                          gpu_id=gpu_id,real_pic=real_pic,model=model,mask_in=mask_in)
-                    if cuda_if:
-                        e2e = get_e2e(model).cuda(gpu_id)
-                        loss = e2e_loss(mask_in*e2e,mask_in*real_pic.cuda(gpu_id)).cuda(gpu_id)
-                    else:
-                        e2e = get_e2e(model)
-                        loss = e2e_loss(mask_in*e2e,mask_in*real_pic)
+                train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,
+                      gpu_id=gpu_id,real_pic=real_pic,model=model)
+                if cuda_if:
+                    e2e = get_e2e(model).cuda(gpu_id)
+                    loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
                 else:
-                    train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,
-                          gpu_id=gpu_id,real_pic=real_pic,model=model)
-                    if cuda_if:
-                        e2e = get_e2e(model).cuda(gpu_id)
-                        loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
-                    else:
-                        e2e = get_e2e(model)
-                        loss = e2e_loss(e2e,real_pic)
-                if self.reg_name:
-                    reg_obj = reg.reg(e2e,self.reg_name)    # add regularization term
-                    loss += reg_obj.loss()/255   # regularization term
+                    e2e = get_e2e(model)
+                    loss = e2e_loss(e2e,real_pic)
+                
                 if i%500==0:
                     #print('epoch ',i+1)
                     #train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
-                    
+                    loss = e2e_loss(e2e,real_pic)
                     loss_cpu = loss.detach().cpu()
                     pic = e2e.cpu().detach().reshape(height,width)
                     pic = data_loader.data_transform(z=pic).shuffle(M=pic,shuffle_list=shuffle_list,mode='to')
@@ -194,6 +182,7 @@ class trainer(object):
                     weight = fc.weight.t()
                 else:
                     weight = fc(weight)
+            t.clamp(weight,0,1)
             return weight
     
         def e2e_loss(e2e,data):
@@ -218,6 +207,9 @@ class trainer(object):
                 else:
                     e2e = get_e2e(model)
                     loss = e2e_loss(e2e,real_pic)
+            if self.reg_name:
+                    reg_obj = reg.reg(e2e,self.reg_name)    # add regularization term
+                    loss += reg_obj.loss()/255  # regularization term
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
