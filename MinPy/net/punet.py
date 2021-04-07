@@ -58,7 +58,7 @@ class net(nn.Module):
                 out_channels=8,
                 kernel_size=3,
                 stride=1,
-                padding=2)
+                padding=1)
         self.deconv1 = Conv2d(
                 in_channels=8,
                 out_channels=1,

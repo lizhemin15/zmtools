@@ -114,26 +114,38 @@ class trainer(object):
         if self.save_list_if == True:
             self.save_list(loss_list)
 
-    def train_dmf(self,height=None,width=None,shuffle_list=None,parameters=[100,100],real_pic=None):
+    def train_dmf(self,height=None,width=None,shuffle_list=None,
+                  parameters=[100,100],real_pic=None,mask_in=None):
         def main(cuda_if = self.cuda_if,gpu_id=self.gpu_id,
                  plot_if=self.plot_if,save_fig_if=self.save_fig_if,
                  save_list_if=self.save_list_if,epoch=self.epoch,
                  height=100,width=100,real_pic=None,
                  shuffle_list=None,parameters=[100,100],
-                 print_if=self.print_if):
+                 print_if=self.print_if,mask_in=None):
             loss_list = []
             model = build_model(parameters=parameters,m=height,n=width,cuda_if=cuda_if,gpu_id=gpu_id)
             if self.cuda_if:
                 model = model.cuda(self.gpu_id)
             optimizer = t.optim.Adam(model.parameters())
             for i in range(epoch):
-                train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,gpu_id=gpu_id,real_pic=real_pic,model=model)
-                if cuda_if:
-                    e2e = get_e2e(model).cuda(gpu_id)
-                    loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
+                if mask_in != None:
+                    train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,
+                          gpu_id=gpu_id,real_pic=real_pic,model=model,mask_in=mask_in)
+                    if cuda_if:
+                        e2e = get_e2e(model).cuda(gpu_id)
+                        loss = e2e_loss(mask_in*e2e,mask_in*real_pic.cuda(gpu_id)).cuda(gpu_id)
+                    else:
+                        e2e = get_e2e(model)
+                        loss = e2e_loss(mask_in*e2e,mask_in*real_pic)
                 else:
-                    e2e = get_e2e(model)
-                    loss = e2e_loss(e2e,real_pic)
+                    train(cuda_if=cuda_if,print_if=print_if, optimizer=optimizer,
+                          gpu_id=gpu_id,real_pic=real_pic,model=model)
+                    if cuda_if:
+                        e2e = get_e2e(model).cuda(gpu_id)
+                        loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
+                    else:
+                        e2e = get_e2e(model)
+                        loss = e2e_loss(e2e,real_pic)
                 if self.reg_name:
                     reg_obj = reg.reg(e2e,self.reg_name)    # add regularization term
                     loss += reg_obj.loss()   # regularization term
@@ -189,14 +201,23 @@ class trainer(object):
             return loss
         
         
-        def train(cuda_if=False,print_if = False, optimizer=None,gpu_id=0,real_pic=None,model=None):
+        def train(cuda_if=False,print_if = False, optimizer=None,
+                  gpu_id=0,real_pic=None,model=None,mask_in=None):
             #训练模型
-            if cuda_if:
-                e2e = get_e2e(model).cuda(gpu_id)
-                loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
+            if mask_in != None:
+                if cuda_if:
+                    e2e = get_e2e(model).cuda(gpu_id)
+                    loss = e2e_loss(mask_in*e2e,mask_in*real_pic.cuda(gpu_id)).cuda(gpu_id)
+                else:
+                    e2e = get_e2e(model)
+                    loss = e2e_loss(mask_in*e2e,mask_in*real_pic)
             else:
-                e2e = get_e2e(model)
-                loss = e2e_loss(e2e,real_pic)
+                if cuda_if:
+                    e2e = get_e2e(model).cuda(gpu_id)
+                    loss = e2e_loss(e2e,real_pic.cuda(gpu_id)).cuda(gpu_id)
+                else:
+                    e2e = get_e2e(model)
+                    loss = e2e_loss(e2e,real_pic)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -205,7 +226,7 @@ class trainer(object):
         ####主程序####
         #############
         main(height=height,width=width,shuffle_list=shuffle_list,
-             parameters=parameters,real_pic=real_pic)
+             parameters=parameters,real_pic=real_pic,mask_in=mask_in)
 
     
     
