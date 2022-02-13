@@ -106,7 +106,7 @@ class auto_reg(object):
                 super(net,self).__init__()
                 self.n = n
                 self.A_0 = nn.Linear(n,n,bias=False)
-                self.softmin = nn.Softmin(1)
+                self.softmax = nn.Softmax(1)
                 self.mode = mode
 
             def forward(self,W):
@@ -116,7 +116,7 @@ class auto_reg(object):
                     Ones = Ones.cuda()
                     I_n = I_n.cuda()
                 A_0 = self.A_0.weight # A_0 \in \mathbb{R}^{n \times n}
-                A_1 = self.softmin(A_0) # A_1 中的元素的取值 \in (0,1) 和为1
+                A_1 = self.softmax(A_0) # A_1 中的元素的取值 \in (0,1) 和为1
                 A_2 = (A_1+A_1.T)/2 # A_2 一定是对称的
                 A_3 = A_2 * (t.mm(Ones,Ones.T)-I_n) # A_3 将中间的元素都归零，作为邻接矩阵
                 A_4 = -A_3+t.mm(A_3,t.mm(Ones,Ones.T))*I_n # A_4 将邻接矩阵转化为拉普拉斯矩阵
