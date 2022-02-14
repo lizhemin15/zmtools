@@ -5,9 +5,6 @@ current_dir = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(current_dir)
 sys.path.append("..")
 
-from ..config import settings
-
-
 
 import torch as t
 import numpy as np
@@ -27,6 +24,23 @@ def get_data(width=100,height=100,pic_name=None):
         x1,y1 = np.meshgrid(x,y)
         z = np.sin(25*np.pi*np.sin(np.pi/3*np.sqrt(x1**2+y1**2)))
         z = z.astype('float32')/z.max()
+    elif 'syn_rank_' in pic_name:
+        rank = int(pic_name.replace('syn_rank_',''))
+        z = np.random.random((height,rank))@np.random.random((rank,width))
+        z = z.astype('float32')/z.max()
+    elif pic_name == 'SynNetflix':
+        basepath = os.path.abspath(__file__)
+        folder = os.path.dirname(basepath)
+        data_path = os.path.join(folder, 'dataset/synthetic_netflix.mat')
+        W_rows,W_cols,z = load_syn(data_path)
+        z = z.astype('float32')
+    elif pic_name in ['gpcr','ic','gpcr','e']:
+        basepath = os.path.abspath(__file__)
+        folder = os.path.dirname(basepath)
+        data_path = os.path.join(folder, 'dataset/DtiData.mat')
+        data = load_drug(data_path)
+        data_name= pic_name
+        z = data[data_name+'AdmatDGC_inl'].T
     else:
         img = cv2.imread(pic_name)
         img = cv2.resize(img, (height,width))

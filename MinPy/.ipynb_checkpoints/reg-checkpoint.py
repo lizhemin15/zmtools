@@ -10,6 +10,7 @@ import torch as t
 import numpy as np
 
 cuda_if = settings.cuda_if
+cuda_num = settings.cuda_num
 
 class hc_reg(object):
     #使用torch写的正则化项
@@ -34,6 +35,8 @@ class hc_reg(object):
             return self.de('row')
         elif self.__name == 'de_col':
             return self.de('col')
+        elif self.__name == 'nn':
+            return self.nn()
         else:
             raise('Please check out your regularization term')
     
@@ -79,13 +82,17 @@ class hc_reg(object):
         Ones = t.ones(M.shape[1],1)
         Eyes = t.eye(M.shape[0])
         if cuda_if:
-            Ones = Ones.cuda()
-            Eyes = Eyes.cuda()
+            Ones = Ones.cuda(cuda_num)
+            Eyes = Eyes.cuda(cuda_num)
         V_M = t.sqrt(t.mm(M**2,Ones))
         cov = t.mm(M,M.T)/t.mm(V_M,V_M.T)
         lap = -cov+2*Eyes
         self.LAP = lap
         return t.trace(t.mm(M.T,t.mm(lap,M)))
+    
+    def nn(self):
+        M = self.__M
+        return t.trace(t.sqrt(t.mm(M.T,M)))
 
         
 
@@ -97,7 +104,7 @@ class auto_reg(object):
         else:
             self.net = self.init_net(size,mode)
         if cuda_if:
-            self.net = self.net.cuda()
+            self.net = self.net.cuda(cuda_num)
         self.opt = self.init_opt()
 
     def init_net(self,n,mode='row'):
@@ -106,17 +113,17 @@ class auto_reg(object):
                 super(net,self).__init__()
                 self.n = n
                 self.A_0 = nn.Linear(n,n,bias=False)
-                self.softmax = nn.Softmax(1)
+                self.softmin = nn.Softmin(1)
                 self.mode = mode
 
             def forward(self,W):
                 Ones = t.ones(self.n,1)
                 I_n = t.from_numpy(np.eye(self.n)).to(t.float32)
                 if cuda_if:
-                    Ones = Ones.cuda()
-                    I_n = I_n.cuda()
+                    Ones = Ones.cuda(cuda_num)
+                    I_n = I_n.cuda(cuda_num)
                 A_0 = self.A_0.weight # A_0 \in \mathbb{R}^{n \times n}
-                A_1 = self.softmax(A_0) # A_1 中的元素的取值 \in (0,1) 和为1
+                A_1 = self.softmin(A_0) # A_1 中的元素的取值 \in (0,1) 和为1
                 A_2 = (A_1+A_1.T)/2 # A_2 一定是对称的
                 A_3 = A_2 * (t.mm(Ones,Ones.T)-I_n) # A_3 将中间的元素都归零，作为邻接矩阵
                 A_4 = -A_3+t.mm(A_3,t.mm(Ones,Ones.T))*I_n # A_4 将邻接矩阵转化为拉普拉斯矩阵
@@ -148,7 +155,7 @@ class cnn_reg(object):
         self.type = 'cnn_reg'
         self.net = self.init_net()
         if cuda_if:
-            self.net = self.net.cuda()
+            self.net = self.net.cuda(cuda_num)
         self.opt = self.init_opt()
 
 
@@ -164,16 +171,16 @@ class cnn_reg(object):
                 Ones = t.ones(3,1)
                 I_n = t.from_numpy(np.eye(3)).to(t.float32)
                 if cuda_if:
-                    Ones = Ones.cuda()
-                    I_n = I_n.cuda()
+                    Ones = Ones.cuda(cuda_num)
+                    I_n = I_n.cuda(cuda_num)
                 K_1 = t.sigmoid(self.K_0.weight) # 使得K_1 中元素大于等于零小于等于一
                 inner_12 = t.tensor([[1,1,1],[1,0,1],[1,1,1]]).to(t.float32)
                 if cuda_if:
-                    inner_12 = inner_12.cuda()
+                    inner_12 = inner_12.cuda(cuda_num)
                 K_2 = -inner_12 * K_1 # 挖空中间的元素，并取负
                 inner_23 = t.tensor([[0,0,0],[0,1,0],[0,0,0]]).to(t.float32)
                 if cuda_if:
-                    inner_23 = inner_23.cuda()
+                    inner_23 = inner_23.cuda(cuda_num)
                 K_3 = K_2 - inner_23 * (t.mm(Ones.T,t.mm(K_2,Ones))) # 向中间填充进周围元素和相反数
                 K_4 = K_3/t.norm(K_3,p='fro') # 将K_3归一化，防止收敛到0矩阵
                 self.K_4 = K_4

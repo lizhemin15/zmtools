@@ -10,19 +10,20 @@ import torch as t
 
 
 cuda_if = settings.cuda_if
+cuda_num = settings.cuda_num
 
 def mse(pre,rel,mask=None):
     if mask == None:
         mask = t.ones(pre.shape)
     if cuda_if:
-        mask = mask.cuda()
+        mask = mask.cuda(cuda_num)
     return ((pre-rel)*mask).pow(2).mean()
 
 def rmse(pre,rel,mask=None):
     if mask == None:
         mask = t.ones(pre.shape)
     if cuda_if:
-        mask = mask.cuda()
+        mask = mask.cuda(cuda_num)
     return t.sqrt(((pre-rel)*mask).pow(2).mean())
 
 
@@ -30,7 +31,7 @@ def nmae(pre,rel,mask=None):
     if mask == None:
         mask = t.ones(pre.shape)
     if cuda_if:
-        mask = mask.cuda()
+        mask = mask.cuda(cuda_num)
     def translate_mask(mask):
         u,v = t.where(mask == 1)
         return u,v
@@ -43,7 +44,7 @@ def mse_inv(pre,rel,mask=None):
     if mask == None:
         mask = t.ones(pre.shape)
     if cuda_if:
-        mask = mask.cuda()
+        mask = mask.cuda(cuda_num)
     pre_now = t.mm(t.mm(rel,pre),rel)
     rel_now = rel
     return mse(pre_now,rel_now,mask)
@@ -54,13 +55,12 @@ def mse_id(pre,rel,mask=None,direc='left'):
     if mask == None:
         mask = t.ones(pre.shape)
     if cuda_if:
-        mask = mask.cuda()
+        mask = mask.cuda(cuda_num)
     if direc == 'left':
         pre_now = t.mm(pre,rel)
     else:
         pre_now = t.mm(rel,pre)
     rel_now = rel
     return mse(pre_now,rel_now,mask)
-
 
 
